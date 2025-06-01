@@ -17,6 +17,7 @@ export function ArchiveSearch() {
       title: "Project Alpha Kickoff",
       type: "Team Meeting",
       thumbnail: "/placeholder.svg?height=120&width=160",
+      status: "done"
     },
     {
       id: 2,
@@ -24,6 +25,7 @@ export function ArchiveSearch() {
       title: "Client Presentation",
       type: "Client Meeting",
       thumbnail: "/placeholder.svg?height=120&width=160",
+      status: "processing"
     },
     {
       id: 3,
@@ -31,6 +33,7 @@ export function ArchiveSearch() {
       title: "Sprint Review",
       type: "Team Meeting",
       thumbnail: "/placeholder.svg?height=120&width=160",
+      status: "failed"
     },
     {
       id: 4,
@@ -38,6 +41,7 @@ export function ArchiveSearch() {
       title: "Budget Planning",
       type: "Finance Meeting",
       thumbnail: "/placeholder.svg?height=120&width=160",
+      status: "done"
     },
     {
       id: 5,
@@ -45,6 +49,7 @@ export function ArchiveSearch() {
       title: "Product Roadmap Discussion",
       type: "Product Meeting",
       thumbnail: "/placeholder.svg?height=120&width=160",
+      status: "processing"
     },
     {
       id: 6,
@@ -52,6 +57,7 @@ export function ArchiveSearch() {
       title: "Marketing Strategy Review",
       type: "Marketing Meeting",
       thumbnail: "/placeholder.svg?height=120&width=160",
+      status: "done"
     },
     {
       id: 7,
@@ -59,6 +65,7 @@ export function ArchiveSearch() {
       title: "Sales Team Alignment",
       type: "Sales Meeting",
       thumbnail: "/placeholder.svg?height=120&width=160",
+      status: "done"
     },
   ]
 
@@ -208,9 +215,21 @@ export function ArchiveSearch() {
                         <div>
                           <p className="text-sm text-gray-500 dark:text-gray-400">{meeting.date}</p>
                           <h3 className="font-semibold text-gray-900 dark:text-white">{meeting.title}</h3>
-                          <Badge variant="secondary" className="text-xs mt-1">
-                            {meeting.type}
-                          </Badge>
+                          <div className="flex gap-2 mt-1">
+                            <Badge variant="secondary" className="text-xs">
+                              {meeting.type}
+                            </Badge>
+                            <Badge 
+                              variant="secondary" 
+                              className={`text-xs ${
+                                meeting.status === 'processing' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300' :
+                                meeting.status === 'failed' ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300' :
+                                'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
+                              }`}
+                            >
+                              {meeting.status.charAt(0).toUpperCase() + meeting.status.slice(1)}
+                            </Badge>
+                          </div>
                         </div>
                         <Button variant="ghost" size="sm" className="text-blue-600 hover:text-blue-700">
                           View
