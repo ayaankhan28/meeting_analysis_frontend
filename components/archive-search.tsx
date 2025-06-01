@@ -9,6 +9,8 @@ import { Search, Video, Mic, Brain } from "lucide-react"
 import axios from "axios"
 import { useAuth } from "@/hooks/useAuth"
 import { useRouter } from "next/navigation"
+import { DefaultIllustration } from "@/components/default-illustration"
+import { ImageWithFallback } from "@/components/image-with-fallback"
 
 type MediaType = "video" | "audio"
 type UploadStatus = "pending" | "processing" | "completed" | "failed"
@@ -25,6 +27,9 @@ interface Media {
   url: string
   created_at: string
   updated_at: string
+  thumbnail?: string
+  title?: string
+  file_name?: string
 }
 
 export function ArchiveSearch() {
@@ -259,19 +264,28 @@ export function ArchiveSearch() {
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {userMedia.map((media) => (
-              <Card key={media.media_id} className="overflow-hidden">
+              <Card 
+                key={media.media_id} 
+                className={`overflow-hidden ${
+                  media.analysis_status === "failed" ? "opacity-60 grayscale" : ""
+                } ${
+                  media.analysis_status === "processing" ? "animate-pulse" : ""
+                }`}
+              >
                 <CardContent className="p-4">
                   <div 
-                    className="aspect-video bg-gray-100 dark:bg-gray-800 rounded-md mb-4 cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                    className={`aspect-video bg-gray-50 dark:bg-gray-800 rounded-md mb-4 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ${
+                      media.analysis_status === "processing" ? "animate-pulse" : ""
+                    }`}
                     onClick={() => router.push(`/insights/${media.media_id}`)}
                   >
-                    <div className="w-full h-full flex items-center justify-center">
-                      {media.file_type === 'video' ? (
-                        <Video className="w-8 h-8 text-gray-500" />
-                      ) : (
-                        <Mic className="w-8 h-8 text-gray-500" />
-                      )}
-                    </div>
+                    <ImageWithFallback
+                      src={media.thumbnail}
+                      alt={`${media.file_type} thumbnail`}
+                      fallbackType={media.file_type === 'video' ? 'video' : 'audio'}
+                      fallbackSize="lg"
+                      className="rounded-md"
+                    />
                   </div>
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
@@ -294,6 +308,9 @@ export function ArchiveSearch() {
                         {media.analysis_status}
                       </Badge>
                     </div>
+                    <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2 line-clamp-2">
+                      {media.title || media.file_name || 'Untitled Meeting'}
+                    </h3>
                     <div className="flex items-center justify-between text-sm text-gray-500">
                       <span>{new Date(media.created_at).toLocaleDateString()}</span>
                       <span>{formatDuration(media.duration)}</span>

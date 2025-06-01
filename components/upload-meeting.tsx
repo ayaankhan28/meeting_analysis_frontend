@@ -3,17 +3,16 @@
 import { useState, useRef, ChangeEvent } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Checkbox } from "@/components/ui/checkbox"
-import { Switch } from "@/components/ui/switch"
 import { Progress } from "@/components/ui/progress"
 import { Upload, Video, Mic } from "lucide-react"
 import axios from "axios"
 import { useAuth } from "@/hooks/useAuth"
+import { DefaultIllustration } from "@/components/default-illustration"
+import { useRouter } from "next/navigation"
 
 export function UploadMeeting() {
+  const router = useRouter()
   const { user } = useAuth()
   const [uploadProgress, setUploadProgress] = useState(0)
   const [isUploading, setIsUploading] = useState(false)
@@ -23,7 +22,7 @@ export function UploadMeeting() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [mediaId, setMediaId] = useState<string | null>(null)
   // TODO: Replace this with actual user ID from your auth system
-  const user_id = "00000000-0000-0000-0000-000000000000" 
+  const user_id = "00000000-0000-0000-0000-000000000000"
 
   const handleFileSelect = (event: ChangeEvent<HTMLInputElement>) => {
     if (event.target.files && event.target.files[0]) {
@@ -125,6 +124,11 @@ export function UploadMeeting() {
       setMediaId(null)
       setFileType(null)
       
+      // Navigate to archive page after successful upload
+      setTimeout(() => {
+        router.push('/archive')
+      }, 1500) // Add a small delay to show the 100% progress
+
       // You might want to store the file_url for later use
       console.log('File uploaded successfully. Public URL:', file_url)
     } catch (error) {
@@ -194,15 +198,18 @@ export function UploadMeeting() {
           >
             <CardContent className="p-16 text-center">
               <div className="space-y-4">
-                <div className="w-16 h-16 bg-blue-100 dark:bg-blue-900/20 rounded-full flex items-center justify-center mx-auto">
-                  {fileType === 'video' ? (
-                    <Video className="w-8 h-8 text-blue-500" />
-                  ) : fileType === 'audio' ? (
-                    <Mic className="w-8 h-8 text-blue-500" />
-                  ) : (
+                {selectedFile ? (
+                  <div className="mx-auto">
+                    <DefaultIllustration 
+                      type={fileType === 'video' ? 'video' : fileType === 'audio' ? 'audio' : 'generic'} 
+                      size="xl"
+                    />
+                  </div>
+                ) : (
+                  <div className="w-16 h-16 bg-blue-100 dark:bg-blue-900/20 rounded-full flex items-center justify-center mx-auto">
                     <Upload className="w-8 h-8 text-blue-500" />
-                  )}
-                </div>
+                  </div>
+                )}
                 <div>
                   <h3 className="text-xl font-medium text-gray-900 dark:text-white mb-2">
                     {selectedFile ? selectedFile.name : 'Drag and drop files here'}
@@ -243,85 +250,6 @@ export function UploadMeeting() {
               <Progress value={uploadProgress} className="h-2" />
             </div>
           )}
-
-          {/* Meeting Details Form */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-6">
-              <div className="space-y-2">
-                <Label htmlFor="meeting-title" className="text-sm font-medium text-gray-900 dark:text-white">
-                  Meeting title
-                </Label>
-                <Input
-                  id="meeting-title"
-                  placeholder="Enter meeting title"
-                  className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="speakers" className="text-sm font-medium text-gray-900 dark:text-white">
-                  Speakers
-                </Label>
-                <Input
-                  id="speakers"
-                  placeholder="Enter speaker names"
-                  className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="language" className="text-sm font-medium text-gray-900 dark:text-white">
-                  Language
-                </Label>
-                <select 
-                  className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md text-sm"
-                  value={selectedLanguage}
-                  onChange={(e) => setSelectedLanguage(e.target.value)}
-                >
-                  <option value="en">English</option>
-                  <option value="es">Spanish</option>
-                  <option value="fr">French</option>
-                  <option value="de">German</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="space-y-6">
-              <div className="space-y-2">
-                <Label htmlFor="tags" className="text-sm font-medium text-gray-900 dark:text-white">
-                  Tags
-                </Label>
-                <Input
-                  id="tags"
-                  placeholder="Add tags"
-                  className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700"
-                />
-              </div>
-
-              {/* Advanced Options */}
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <Label className="text-sm font-medium text-gray-900 dark:text-white">Advanced</Label>
-                  <Switch />
-                </div>
-
-                <div className="space-y-3 pl-4 border-l-2 border-gray-200 dark:border-gray-700">
-                  <div className="flex items-center space-x-2">
-                    <Checkbox id="ocr" defaultChecked />
-                    <Label htmlFor="ocr" className="text-sm text-gray-700 dark:text-gray-300">
-                      OCR
-                    </Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Checkbox id="emotion-detection" />
-                    <Label htmlFor="emotion-detection" className="text-sm text-gray-700 dark:text-gray-300">
-                      Real-time emotion detection
-                    </Label>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
         </TabsContent>
 
         <TabsContent value="live-recording" className="space-y-8 mt-8">

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -20,6 +20,8 @@ import axios from "axios"
 import { useAuth } from "@/hooks/useAuth"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
+import { DefaultIllustration } from "@/components/default-illustration"
+import { ImageWithFallback } from "@/components/image-with-fallback"
 
 interface Chapter {
   chapter_title: string;
@@ -40,8 +42,10 @@ interface AnalysisMetadata {
 interface AnalysisData {
   status: string;
   meta: AnalysisMetadata;
+  transcription: string;
   created_at: string;
   updated_at: string;
+  media_url: string;
 }
 
 interface ApiResponse {
@@ -52,8 +56,10 @@ interface ApiResponse {
 interface MeetingInsight {
   id: string
   title: string
+  description: string
   date: string
   duration: number
+  mediaUrl: string
   participants: {
     name: string
     avatar?: string
@@ -71,13 +77,15 @@ interface MeetingInsight {
     content: string
     thumbnail_url?: string | null
   }[]
-  transcript: string[]
+  transcript: string
+  transcriptLines: string[]
 }
 
 export default function MeetingInsightPage() {
   const params = useParams()
   const router = useRouter()
   const { user } = useAuth()
+  const videoRef = useRef<HTMLVideoElement>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [insight, setInsight] = useState<MeetingInsight | null>(null)
@@ -99,16 +107,30 @@ export default function MeetingInsightPage() {
           const analysisData = response.data.data;
           const meta = analysisData.meta;
           
+          // Process transcription - split into lines/sentences for better display
+          const processTranscription = (transcription: string): string[] => {
+            if (!transcription) return [];
+            
+            // Split by periods, exclamation marks, or question marks followed by space
+            // This creates more readable transcript segments
+            return transcription
+              .split(/(?<=[.!?])\s+/)
+              .filter(line => line.trim().length > 0)
+              .map(line => line.trim());
+          };
+          
           // Transform API data to match our interface
           setInsight({
             id: params.id as string,
-            title: meta.video_title,
+            title: meta.video_title || 'Meeting Recording',
+            description: meta.description,
             date: analysisData.created_at,
             duration: 0, // Duration not provided in API
+            mediaUrl: analysisData.media_url,
             participants: [], // Participants not provided in API
             topics: meta.chapters.map((chapter: Chapter) => chapter.chapter_title),
-            actionItems: meta.action_items,
-            keyDecisions: [meta.final_decision],
+            actionItems: meta.action_items || [],
+            keyDecisions: meta.final_decision ? [meta.final_decision] : [],
             meetingChapters: meta.chapters.map((chapter: Chapter) => ({
               title: chapter.chapter_title,
               startTime: chapter.timestamp,
@@ -117,7 +139,8 @@ export default function MeetingInsightPage() {
               content: chapter.content,
               thumbnail_url: chapter.thumbnail_url
             })),
-            transcript: [] // Transcript not provided in API
+            transcript: analysisData.transcription || '',
+            transcriptLines: processTranscription(analysisData.transcription || '')
           });
         } else {
           setError("Analysis not complete or failed");
@@ -167,6 +190,47 @@ export default function MeetingInsightPage() {
     }
   }
 
+  const navigateToTimestamp = (timestamp: string) => {
+    if (!videoRef.current) return
+    
+    try {
+      console.log('Raw timestamp:', timestamp)
+      
+      let totalSeconds = 0
+      
+      // Handle different timestamp formats
+      if (timestamp.includes(':')) {
+        // Format: "HH:MM:SS" or "MM:SS"
+        const parts = timestamp.split(':').map(Number)
+        if (parts.length === 3) {
+          // HH:MM:SS
+          totalSeconds = (parts[0] * 3600) + (parts[1] * 60) + parts[2]
+        } else if (parts.length === 2) {
+          // MM:SS
+          totalSeconds = (parts[0] * 60) + parts[1]
+        }
+      } else {
+        // Format: number in seconds
+        totalSeconds = parseFloat(timestamp)
+      }
+      
+      console.log('Converted seconds:', totalSeconds)
+      
+      // Validate the result is a finite number
+      if (!isFinite(totalSeconds)) {
+        console.error('Invalid timestamp conversion result:', totalSeconds)
+        return
+      }
+      
+      // Set video current time
+      videoRef.current.currentTime = totalSeconds
+      // Start playing from the new position
+      videoRef.current.play()
+    } catch (error) {
+      console.error('Error navigating to timestamp:', error)
+    }
+  }
+
   if (loading) {
     return <div className="flex items-center justify-center min-h-screen">Loading...</div>
   }
@@ -189,6 +253,11 @@ export default function MeetingInsightPage() {
           Back to Archive
         </Button>
         <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">{insight.title}</h1>
+        {insight.description && (
+          <p className="text-lg text-gray-600 dark:text-gray-400 leading-relaxed">
+            {insight.description}
+          </p>
+        )}
       </div>
 
       {/* Full Width Layout */}
@@ -199,12 +268,27 @@ export default function MeetingInsightPage() {
           <div className="col-span-8">
             <Card className="border border-gray-200 dark:border-gray-700">
               <CardContent className="p-4">
-                <div className="aspect-video bg-gray-100 dark:bg-gray-800 rounded-lg flex items-center justify-center">
-                  <div className="text-center">
-                    <Video className="w-16 h-16 text-gray-400 mx-auto mb-2" />
-                    <p className="text-gray-500">Video to watch</p>
+                {insight.mediaUrl ? (
+                  <div className="aspect-video bg-gray-100 dark:bg-gray-800 rounded-lg overflow-hidden">
+                    <video 
+                      ref={videoRef}
+                      className="w-full h-full"
+                      controls
+                      preload="metadata"
+                      poster={insight.meetingChapters[0]?.thumbnail_url || undefined}
+                    >
+                      <source src={insight.mediaUrl} type="video/mp4" />
+                      Your browser does not support the video tag.
+                    </video>
                   </div>
-                </div>
+                ) : (
+                  <div className="aspect-video bg-gray-100 dark:bg-gray-800 rounded-lg flex items-center justify-center">
+                    <div className="text-center">
+                      <Video className="w-16 h-16 text-gray-400 mx-auto mb-2" />
+                      <p className="text-gray-500">Video not available</p>
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>
@@ -263,36 +347,62 @@ export default function MeetingInsightPage() {
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Chapters</h2>
             <div className="flex gap-2">
-              <Button variant="outline" size="icon">
+              <Button 
+                variant="outline" 
+                size="icon" 
+                onClick={() => {
+                  const container = document.getElementById('chapters-container');
+                  if (container) {
+                    container.scrollLeft -= container.clientWidth / 2;
+                  }
+                }}
+              >
                 <ChevronLeft className="w-4 h-4" />
               </Button>
-              <Button variant="outline" size="icon">
+              <Button 
+                variant="outline" 
+                size="icon"
+                onClick={() => {
+                  const container = document.getElementById('chapters-container');
+                  if (container) {
+                    container.scrollLeft += container.clientWidth / 2;
+                  }
+                }}
+              >
                 <ChevronRight className="w-4 h-4" />
               </Button>
             </div>
           </div>
-          <div className="grid grid-cols-4 gap-4">
+          <div 
+            id="chapters-container"
+            className="flex overflow-x-auto gap-4 pb-4 snap-x snap-mandatory scrollbar-hide"
+            style={{ 
+              scrollBehavior: 'smooth',
+              msOverflowStyle: 'none',
+              scrollbarWidth: 'none'
+            }}
+          >
             {insight.meetingChapters.map((chapter, index) => (
-              <Card 
+              <Card
                 key={index} 
-                className={`border cursor-pointer hover:shadow-md transition-all ${
+                className={`flex-none w-[300px] snap-start cursor-pointer hover:shadow-md transition-all ${
                   selectedChapter === index 
                     ? 'border-blue-500 ring-2 ring-blue-200 dark:ring-blue-800' 
                     : 'border-gray-200 dark:border-gray-700'
                 }`}
-                onClick={() => setSelectedChapter(index)}
+                onClick={() => {
+                  setSelectedChapter(index)
+                  navigateToTimestamp(chapter.startTime)
+                }}
               >
                 <CardContent className="p-4">
-                  <div className="aspect-video bg-gray-100 dark:bg-gray-800 rounded mb-3 flex items-center justify-center overflow-hidden">
-                    {insight.meetingChapters[index].thumbnail_url ? (
-                      <img 
-                        src={insight.meetingChapters[index].thumbnail_url} 
-                        alt={`Thumbnail for ${chapter.title}`}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <span className="text-gray-400 text-sm">Chapter {index + 1}</span>
-                    )}
+                  <div className="aspect-video bg-gray-100 dark:bg-gray-800 rounded mb-3 overflow-hidden">
+                    <ImageWithFallback
+                      src={insight.meetingChapters[index].thumbnail_url}
+                      alt={`Thumbnail for ${chapter.title}`}
+                      fallbackType="meeting"
+                      fallbackSize="md"
+                    />
                   </div>
                   <p className="text-sm font-medium text-gray-900 dark:text-white text-center">
                     {chapter.title}
@@ -326,26 +436,8 @@ export default function MeetingInsightPage() {
 
         {/* 2x2 Grid Sections - Using more space */}
         <div className="grid grid-cols-12 gap-6">
-          {/* Key Points */}
-          <div className="col-span-3">
-            <Card className="border border-gray-200 dark:border-gray-700 h-full">
-              <CardHeader>
-                <CardTitle className="text-lg">Key Points</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ul className="space-y-2">
-                  <li className="text-gray-700 dark:text-gray-300">• Meeting duration: {formatDuration(insight.duration)}</li>
-                  <li className="text-gray-700 dark:text-gray-300">• Participants: {insight.participants.length} attendees</li>
-                  <li className="text-gray-700 dark:text-gray-300">• Topics covered: {insight.topics.length} main areas</li>
-                  <li className="text-gray-700 dark:text-gray-300">• Action items created: {insight.actionItems.length}</li>
-                  <li className="text-gray-700 dark:text-gray-300">• Key decisions made: {insight.keyDecisions.length}</li>
-                </ul>
-              </CardContent>
-            </Card>
-          </div>
-
           {/* Decision Made */}
-          <div className="col-span-3">
+          <div className="col-span-6">
             <Card className="border border-gray-200 dark:border-gray-700 h-full">
               <CardHeader>
                 <CardTitle className="text-lg">Decision made</CardTitle>
@@ -363,7 +455,7 @@ export default function MeetingInsightPage() {
           </div>
 
           {/* Action Items */}
-          <div className="col-span-3">
+          <div className="col-span-6">
             <Card className="border border-gray-200 dark:border-gray-700 h-full">
               <CardHeader>
                 <CardTitle className="text-lg">Action Items</CardTitle>
@@ -381,7 +473,7 @@ export default function MeetingInsightPage() {
           </div>
 
           {/* Summary */}
-          <div className="col-span-3">
+          <div className="col-span-12">
             <Card className="border border-gray-200 dark:border-gray-700 h-full">
               <CardHeader>
                 <CardTitle className="text-lg">Summary</CardTitle>
@@ -399,83 +491,13 @@ export default function MeetingInsightPage() {
           </div>
         </div>
 
-        {/* Additional Info Row - Full Width */}
-        <div className="grid grid-cols-12 gap-6">
-          {/* Topics */}
-          <div className="col-span-4">
-            <Card className="border border-gray-200 dark:border-gray-700">
-              <CardHeader>
-                <CardTitle className="text-lg">Topics Discussed</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex flex-wrap gap-2">
-                  {insight.topics.map((topic, index) => (
-                    <Badge key={index} variant="secondary" className="text-xs">
-                      {topic}
-                    </Badge>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Participants */}
-          <div className="col-span-4">
-            <Card className="border border-gray-200 dark:border-gray-700">
-              <CardHeader>
-                <CardTitle className="text-lg">Participants</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {insight.participants.map((participant, index) => (
-                    <div key={index} className="flex items-center gap-3">
-                      <Avatar>
-                        <AvatarImage src={participant.avatar} />
-                        <AvatarFallback>{participant.name.split(' ').map(n => n[0]).join('')}</AvatarFallback>
-                      </Avatar>
-                      <div className="flex-1">
-                        <p className="font-medium text-gray-900 dark:text-white">{participant.name}</p>
-                        <p className="text-sm text-gray-600 dark:text-gray-400">{participant.role}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Ask Anything */}
-          <div className="col-span-4">
-            <Card className="border border-gray-200 dark:border-gray-700">
-              <CardHeader>
-                <CardTitle className="text-lg">Ask Anything</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="relative">
-                  <Input
-                    placeholder="Ask about the meeting..."
-                    className="pr-10"
-                  />
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="absolute right-0 top-0 h-full"
-                  >
-                    <Search className="w-4 h-4" />
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-
         {/* Transcript - Full Width */}
         <Card className="border border-gray-200 dark:border-gray-700">
           <CardHeader>
             <div className="flex items-center justify-between">
               <CardTitle className="text-lg">Transcript</CardTitle>
               <div className="flex items-center gap-2 text-sm text-gray-500">
-                <span>Scroll support</span>
+                <span>{insight.transcriptLines.length > 0 ? `${insight.transcriptLines.length} segments` : 'No transcript available'}</span>
                 <div className="w-4 h-8 border border-gray-300 rounded-sm flex items-center justify-center">
                   <div className="w-2 h-4 bg-gray-400 rounded-sm"></div>
                 </div>
@@ -484,13 +506,26 @@ export default function MeetingInsightPage() {
           </CardHeader>
           <CardContent>
             <div className="max-h-64 overflow-y-auto border border-gray-200 dark:border-gray-700 rounded p-4 bg-gray-50 dark:bg-gray-800">
-              <div className="space-y-3">
-                {insight.transcript.map((line, index) => (
-                  <p key={index} className="text-gray-700 dark:text-gray-300">
-                    • {line}
+              {insight.transcriptLines.length > 0 ? (
+                <div className="space-y-3">
+                  {insight.transcriptLines.map((line, index) => (
+                    <div key={index} className="flex gap-3">
+                      <span className="text-xs text-gray-400 font-mono min-w-[3rem] mt-1">
+                        {String(index + 1).padStart(3, '0')}
+                      </span>
+                      <p className="text-gray-700 dark:text-gray-300 leading-relaxed flex-1">
+                        {line}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <p className="text-gray-500 dark:text-gray-400">
+                    {insight.transcript ? 'Processing transcript...' : 'No transcript available for this meeting.'}
                   </p>
-                ))}
-              </div>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>

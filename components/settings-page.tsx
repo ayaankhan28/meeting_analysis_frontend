@@ -2,162 +2,221 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Switch } from "@/components/ui/switch"
-import { Calendar, FileText, MessageSquare, Settings, Hash } from "lucide-react"
+import { useState, useEffect } from "react"
+import { Input } from "@/components/ui/input"
+import { useToast } from "@/components/ui/use-toast"
+import { useUser } from "@/contexts/UserContext"
+
+const WhatsAppIcon = () => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 24 24"
+    className="w-5 h-5 text-gray-600 dark:text-gray-400"
+    fill="currentColor"
+  >
+    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+  </svg>
+)
 
 export function SettingsPage() {
-  const connectedAccounts = [
-    {
-      name: "Calendar",
-      description: "Connect your calendar to automatically import meetings",
-      icon: Calendar,
-      connected: false,
-    },
-    {
-      name: "Notes",
-      description: "Connect your notes app to automatically export meeting notes",
-      icon: FileText,
-      connected: false,
-    },
-    {
-      name: "Messaging",
-      description: "Connect your messaging app to automatically send meeting summaries",
-      icon: MessageSquare,
-      connected: false,
-    },
-  ]
+  const [phoneNumber, setPhoneNumber] = useState("")
+  const [isConnected, setIsConnected] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
+  const { toast } = useToast()
+  const { user } = useUser()
+
+  // Initialize connection status based on user data
+  useEffect(() => {
+    if (user?.notification_active && user?.phone_number) {
+      setPhoneNumber(user.phone_number)
+      setIsConnected(true)
+    }
+  }, [user])
+
+  const handleConnect = async () => {
+    if (!isConnected) {
+      console.log('Attempting to connect with phone number:', phoneNumber)
+      // Validate phone number format
+      const phoneRegex = /^\+?[1-9]\d{1,14}$/
+      if (!phoneRegex.test(phoneNumber)) {
+        toast({
+          title: "Invalid Phone Number",
+          description: "Please enter a valid phone number with country code (e.g. +1234567890)",
+          variant: "destructive"
+        })
+        return
+      }
+
+      if (!user?.id) {
+        toast({
+          title: "Authentication Error",
+          description: "Please log in to enable WhatsApp notifications",
+          variant: "destructive"
+        })
+        return
+      }
+
+      setIsLoading(true)
+      try {
+        console.log('Making API call to connect endpoint')
+        const response = await fetch('http://localhost:8000/connect', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          body: JSON.stringify({ 
+            phone_number: phoneNumber,
+            user_id: user.id
+          })
+        })
+
+        console.log('API Response:', response)
+
+        if (!response.ok) {
+          const errorData = await response.json()
+          console.error('Error response:', errorData)
+          throw new Error(errorData.detail || 'Failed to connect WhatsApp')
+        }
+
+        const data = await response.json()
+        console.log('Success response:', data)
+
+        setIsConnected(true)
+        toast({
+          title: "WhatsApp Connected",
+          description: "You will now receive meeting analysis notifications via WhatsApp",
+          variant: "default"
+        })
+      } catch (error) {
+        console.error('Connection error:', error)
+        toast({
+          title: "Connection Failed",
+          description: "Failed to connect WhatsApp. Please try again.",
+          variant: "destructive"
+        })
+      } finally {
+        setIsLoading(false)
+      }
+    } else {
+      // Handle disconnect
+      setIsLoading(true)
+      try {
+        console.log('Making API call to disconnect endpoint')
+        const response = await fetch('http://localhost:8000/disconnect', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          body: JSON.stringify({ 
+            user_id: user?.id
+          })
+        })
+
+        console.log('Disconnect API Response:', response)
+
+        if (!response.ok) {
+          const errorData = await response.json()
+          console.error('Disconnect error response:', errorData)
+          throw new Error(errorData.detail || 'Failed to disconnect WhatsApp')
+        }
+
+        setIsConnected(false)
+        setPhoneNumber("")
+        toast({
+          title: "WhatsApp Disconnected",
+          description: "You will no longer receive WhatsApp notifications",
+          variant: "default"
+        })
+      } catch (error) {
+        console.error('Disconnection error:', error)
+        toast({
+          title: "Disconnection Failed",
+          description: "Failed to disconnect WhatsApp. Please try again.",
+          variant: "destructive"
+        })
+      } finally {
+        setIsLoading(false)
+      }
+    }
+  }
 
   return (
     <div className="max-w-4xl mx-auto space-y-8">
       {/* Header */}
       <div className="space-y-2">
         <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Settings</h1>
+        <p className="text-gray-600 dark:text-gray-400">
+          Configure your WhatsApp notification settings
+        </p>
       </div>
 
-      {/* Connected Accounts */}
+      {/* WhatsApp Notifications */}
       <Card className="border-0 bg-white dark:bg-gray-800">
         <CardHeader>
-          <CardTitle className="text-lg font-semibold">Connected Accounts</CardTitle>
+          <CardTitle className="text-lg font-semibold">WhatsApp Notifications</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {connectedAccounts.map((account) => (
-            <div
-              key={account.name}
-              className="flex items-center justify-between p-4 border border-gray-200 dark:border-gray-700 rounded-lg"
-            >
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 bg-gray-100 dark:bg-gray-700 rounded-lg flex items-center justify-center">
-                  <account.icon className="w-5 h-5 text-gray-600 dark:text-gray-400" />
-                </div>
-                <div>
-                  <h3 className="font-medium text-gray-900 dark:text-white">{account.name}</h3>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">{account.description}</p>
-                </div>
-              </div>
-              <Button variant="outline" size="sm">
-                Connect
-              </Button>
-            </div>
-          ))}
-        </CardContent>
-      </Card>
-
-      {/* Audio & Video Processing */}
-      <Card className="border-0 bg-white dark:bg-gray-800">
-        <CardHeader>
-          <CardTitle className="text-lg font-semibold">Audio & Video Processing</CardTitle>
-        </CardHeader>
-        <CardContent>
           <div className="flex items-center justify-between p-4 border border-gray-200 dark:border-gray-700 rounded-lg">
             <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-gray-100 dark:bg-gray-700 rounded-lg flex items-center justify-center">
-                <Settings className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+              <div className="w-10 h-10 bg-[#25D366] dark:bg-[#25D366] rounded-lg flex items-center justify-center">
+                <WhatsAppIcon />
               </div>
               <div>
-                <h3 className="font-medium text-gray-900 dark:text-white">Automatic Processing</h3>
+                <h3 className="font-medium text-gray-900 dark:text-white">WhatsApp</h3>
                 <p className="text-sm text-gray-600 dark:text-gray-400">
-                  Automatically process audio and video recordings after meetings
+                  Receive meeting summaries and notifications via WhatsApp
                 </p>
               </div>
             </div>
-            <Switch />
+            <Button 
+              variant={isConnected ? "destructive" : "outline"} 
+              size="sm"
+              onClick={handleConnect}
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <span className="flex items-center">
+                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Connecting...
+                </span>
+              ) : isConnected ? "Disconnect" : "Connect"}
+            </Button>
           </div>
-        </CardContent>
-      </Card>
 
-      {/* Transcription Model */}
-      <Card className="border-0 bg-white dark:bg-gray-800">
-        <CardHeader>
-          <CardTitle className="text-lg font-semibold">Transcription Model</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-3">
-            <div className="flex items-center space-x-3 p-3 border-2 border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/10 rounded-lg">
-              <div className="w-4 h-4 bg-green-500 rounded-full"></div>
-              <div>
-                <h3 className="font-medium text-gray-900 dark:text-white">Whisper</h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400">High accuracy, slower processing</p>
+          {!isConnected && (
+            <div className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg">
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    WhatsApp Phone Number
+                  </label>
+                  <Input
+                    type="tel"
+                    placeholder="+1234567890"
+                    value={phoneNumber}
+                    onChange={(e) => setPhoneNumber(e.target.value)}
+                    className="w-full"
+                  />
+                  <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                    Enter your phone number with country code
+                  </p>
+                </div>
               </div>
             </div>
-            <div className="flex items-center space-x-3 p-3 border border-gray-200 dark:border-gray-700 rounded-lg">
-              <div className="w-4 h-4 border-2 border-gray-300 dark:border-gray-600 rounded-full"></div>
-              <div>
-                <h3 className="font-medium text-gray-900 dark:text-white">Fast Whisper</h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Lower accuracy, faster processing</p>
-              </div>
+          )}
+
+          {isConnected && (
+            <div className="p-4 bg-green-50 dark:bg-green-900/10 border border-green-200 dark:border-green-800 rounded-lg">
+              <p className="text-sm text-green-700 dark:text-green-300">
+                WhatsApp notifications are enabled for: {phoneNumber}
+              </p>
             </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Language */}
-      <Card className="border-0 bg-white dark:bg-gray-800">
-        <CardHeader>
-          <CardTitle className="text-lg font-semibold">Language</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <select className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md text-sm">
-            <option>English</option>
-            <option>Spanish</option>
-            <option>French</option>
-            <option>German</option>
-          </select>
-        </CardContent>
-      </Card>
-
-      {/* Export Settings */}
-      <Card className="border-0 bg-white dark:bg-gray-800">
-        <CardHeader>
-          <CardTitle className="text-lg font-semibold">Export Settings</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <select className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md text-sm">
-            <option>PDF</option>
-            <option>Markdown</option>
-            <option>JSON</option>
-            <option>Word Document</option>
-          </select>
-        </CardContent>
-      </Card>
-
-      {/* Branding */}
-      <Card className="border-0 bg-white dark:bg-gray-800">
-        <CardHeader>
-          <CardTitle className="text-lg font-semibold">Branding</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center justify-between p-4 border border-gray-200 dark:border-gray-700 rounded-lg">
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-gray-100 dark:bg-gray-700 rounded-lg flex items-center justify-center">
-                <Hash className="w-5 h-5 text-gray-600 dark:text-gray-400" />
-              </div>
-              <div>
-                <h3 className="font-medium text-gray-900 dark:text-white">Branding</h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Add MeetingIQ Pro branding to exported notes</p>
-              </div>
-            </div>
-            <Switch />
-          </div>
+          )}
         </CardContent>
       </Card>
     </div>
