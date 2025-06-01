@@ -1,14 +1,69 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { Search } from "lucide-react"
+import { Search, Video, Mic, Brain } from "lucide-react"
+import axios from "axios"
+import { useAuth } from "@/hooks/useAuth"
+import { useRouter } from "next/navigation"
+
+type MediaType = "video" | "audio"
+type UploadStatus = "pending" | "processing" | "completed" | "failed"
+type AnalysisStatus = "pending" | "processing" | "completed" | "failed"
+
+interface Media {
+  media_id: string
+  user_id: string
+  file_type: MediaType
+  upload_status: UploadStatus
+  analysis_status: AnalysisStatus
+  duration?: number
+  language?: string
+  url: string
+  created_at: string
+  updated_at: string
+}
 
 export function ArchiveSearch() {
+  const { user } = useAuth()
+  const router = useRouter()
   const [searchQuery, setSearchQuery] = useState("")
+  const [userMedia, setUserMedia] = useState<Media[]>([])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (user?.id) {
+      fetchUserMedia()
+    }
+  }, [user?.id])
+
+  const formatDuration = (seconds?: number): string => {
+    if (!seconds) return 'Unknown duration'
+    const minutes = Math.floor(seconds / 60)
+    const remainingSeconds = seconds % 60
+    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`
+  }
+
+  const fetchUserMedia = async () => {
+    if (!user?.id) return
+    
+    try {
+      setLoading(true)
+      setError(null)
+      const response = await axios.get(`${process.env.NEXT_PUBLIC_BACKEND_URL}/get-user-media?user_id=${user.id}`)
+      console.log('User media response:', response.data)
+      setUserMedia(response.data)
+    } catch (err) {
+      setError("Failed to fetch media")
+      console.error("Error fetching user media:", err)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const meetings = [
     {
@@ -198,44 +253,56 @@ export function ArchiveSearch() {
         {/* Results */}
         <div className="space-y-4">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Results</h2>
-
-          <div className="space-y-4">
-            {meetings.map((meeting) => (
-              <Card
-                key={meeting.id}
-                className="border-0 bg-white dark:bg-gray-800 hover:shadow-md transition-shadow cursor-pointer"
-              >
+          
+          {loading && <div className="text-center py-4">Loading...</div>}
+          {error && <div className="text-red-500 py-4">{error}</div>}
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {userMedia.map((media) => (
+              <Card key={media.media_id} className="overflow-hidden">
                 <CardContent className="p-4">
-                  <div className="flex items-center space-x-4">
-                    <div className="w-20 h-16 bg-gradient-to-br from-orange-100 to-orange-200 dark:from-orange-900/20 dark:to-orange-800/20 rounded-lg flex items-center justify-center">
-                      <div className="w-12 h-12 bg-gradient-to-br from-orange-200 to-orange-300 dark:from-orange-800/40 dark:to-orange-700/40 rounded-lg"></div>
+                  <div 
+                    className="aspect-video bg-gray-100 dark:bg-gray-800 rounded-md mb-4 cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                    onClick={() => router.push(`/insights/${media.media_id}`)}
+                  >
+                    <div className="w-full h-full flex items-center justify-center">
+                      {media.file_type === 'video' ? (
+                        <Video className="w-8 h-8 text-gray-500" />
+                      ) : (
+                        <Mic className="w-8 h-8 text-gray-500" />
+                      )}
                     </div>
-                    <div className="flex-1">
-                      <div className="flex items-center justify-between mb-2">
-                        <div>
-                          <p className="text-sm text-gray-500 dark:text-gray-400">{meeting.date}</p>
-                          <h3 className="font-semibold text-gray-900 dark:text-white">{meeting.title}</h3>
-                          <div className="flex gap-2 mt-1">
-                            <Badge variant="secondary" className="text-xs">
-                              {meeting.type}
-                            </Badge>
-                            <Badge 
-                              variant="secondary" 
-                              className={`text-xs ${
-                                meeting.status === 'processing' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300' :
-                                meeting.status === 'failed' ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300' :
-                                'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
-                              }`}
-                            >
-                              {meeting.status.charAt(0).toUpperCase() + meeting.status.slice(1)}
-                            </Badge>
-                          </div>
-                        </div>
-                        <Button variant="ghost" size="sm" className="text-blue-600 hover:text-blue-700">
-                          View
-                        </Button>
-                      </div>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Badge variant={media.file_type === "video" ? "default" : "secondary"}>
+                        {media.file_type}
+                      </Badge>
+                      <Badge 
+                        variant={
+                          media.analysis_status === "completed" ? "default" :
+                          media.analysis_status === "failed" ? "destructive" :
+                          media.analysis_status === "processing" ? "secondary" : "outline"
+                        }
+                        className={
+                          media.analysis_status === "completed" ? "bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400" :
+                          media.analysis_status === "failed" ? "bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400" :
+                          media.analysis_status === "processing" ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400" :
+                          "bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400"
+                        }
+                      >
+                        {media.analysis_status}
+                      </Badge>
                     </div>
+                    <div className="flex items-center justify-between text-sm text-gray-500">
+                      <span>{new Date(media.created_at).toLocaleDateString()}</span>
+                      <span>{formatDuration(media.duration)}</span>
+                    </div>
+                    {media.language && (
+                      <Badge variant="outline" className="text-xs">
+                        Language: {media.language}
+                      </Badge>
+                    )}
                   </div>
                 </CardContent>
               </Card>

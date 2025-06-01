@@ -243,20 +243,6 @@ export default function MeetingIQDashboard() {
             {/* Upcoming Meetings */}
             <div className="space-y-4">
               <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Upcoming Meetings</h2>
-              <Card className="border-0 bg-white dark:bg-gray-800">
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      <h3 className="font-semibold text-gray-900 dark:text-white mb-2">Project Alpha Kickoff</h3>
-                      <p className="text-gray-600 dark:text-gray-400 mb-4">10:00 AM - 11:00 AM</p>
-                    </div>
-                    <div className="w-48 h-32 bg-gradient-to-br from-green-100 to-blue-100 dark:from-green-900/20 dark:to-blue-900/20 rounded-lg flex items-center justify-center mr-4">
-                      <div className="w-24 h-24 bg-gradient-to-br from-green-200 to-blue-200 dark:from-green-800/40 dark:to-blue-800/40 rounded-lg"></div>
-                    </div>
-                    <Button className="bg-green-500 hover:bg-green-600 text-white">Join & Record</Button>
-                  </div>
-                </CardContent>
-              </Card>
             </div>
 
             {/* Quick Upload */}

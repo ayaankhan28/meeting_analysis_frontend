@@ -115,6 +115,9 @@ export function UploadMeeting() {
         duration: Math.round(mediaDuration)
       })
 
+      // Start processing the file immediately after successful upload
+      await axios.post(`http://localhost:8000/media/${media_id}/analyze`)
+
       // Reset state after successful upload
       setIsUploading(false)
       setUploadProgress(100)

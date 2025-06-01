@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
 import { Separator } from "@/components/ui/separator";
+import { syncUser } from "@/lib/api";
 
 export default function AuthPage() {
   const [email, setEmail] = useState("");
@@ -22,7 +23,7 @@ export default function AuthPage() {
     setIsLoading(true);
 
     try {
-      const { error } = isSignUp
+      const { data, error } = isSignUp
         ? await supabase.auth.signUp({
             email,
             password,
@@ -38,6 +39,16 @@ export default function AuthPage() {
       if (error) {
         toast.error(error.message);
         return;
+      }
+
+      // Sync user data with our backend
+      if (data.user) {
+        try {
+          await syncUser(data.user);
+        } catch (error) {
+          console.error('Error syncing user:', error);
+          // Don't block the auth flow if sync fails
+        }
       }
 
       if (isSignUp) {
