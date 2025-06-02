@@ -23,6 +23,9 @@ import { Input } from "@/components/ui/input"
 import { DefaultIllustration } from "@/components/default-illustration"
 import { ImageWithFallback } from "@/components/image-with-fallback"
 import { API_BASE_URL } from "@/lib/config"
+import { saveAs } from 'file-saver'
+import { Document, Packer, Paragraph, TextRun, HeadingLevel } from 'docx'
+import jsPDF from 'jspdf'
 
 interface Chapter {
   chapter_title: string;
@@ -80,6 +83,24 @@ interface MeetingInsight {
   }[]
   transcript: string
   transcriptLines: string[]
+}
+
+interface ExportData {
+  title: string
+  date: string
+  summary: string
+  decisions: string[]
+  actionItems: string[]
+  chapters: {
+    title: string
+    timestamp: string
+    content: string
+  }[]
+  transcript: string[]
+  chatHistory: {
+    type: string
+    message: string
+  }[]
 }
 
 export default function MeetingInsightPage() {
@@ -259,6 +280,287 @@ export default function MeetingInsightPage() {
       console.error('Error navigating to timestamp:', error)
     }
   }
+
+  const prepareExportData = (): ExportData => {
+    if (!insight) throw new Error('No insight data available')
+    
+    return {
+      title: insight.title,
+      date: new Date(insight.date).toLocaleDateString(),
+      summary: insight.description,
+      decisions: insight.keyDecisions,
+      actionItems: insight.actionItems,
+      chapters: insight.meetingChapters.map(chapter => ({
+        title: chapter.title,
+        timestamp: chapter.startTime,
+        content: chapter.content
+      })),
+      transcript: insight.transcriptLines,
+      chatHistory: chatMessages.map(msg => ({
+        type: msg.type,
+        message: msg.message
+      }))
+    }
+  }
+
+  const exportAsPDF = () => {
+    try {
+      const data = prepareExportData()
+      const doc = new jsPDF()
+      let yPos = 20
+      const pageWidth = doc.internal.pageSize.getWidth()
+      const margin = 20
+      const contentWidth = pageWidth - (margin * 2)
+
+      // Helper function to add text and return the new Y position
+      const addText = (text: string, size = 12, isBold = false) => {
+        doc.setFontSize(size)
+        if (isBold) {
+          doc.setFont("helvetica", 'bold')
+        } else {
+          doc.setFont("helvetica", 'normal')
+        }
+        
+        // Word wrap for long text
+        const lines = doc.splitTextToSize(text, contentWidth)
+        doc.text(lines, margin, yPos)
+        yPos += (lines.length * size * 0.3527) + 5 // Convert pt to mm and add spacing
+        
+        // Add new page if we're near the bottom
+        if (yPos > doc.internal.pageSize.getHeight() - margin) {
+          doc.addPage()
+          yPos = margin
+        }
+      }
+
+      // Title
+      addText(data.title, 24, true)
+      addText(`Date: ${data.date}`, 12)
+      yPos += 10
+
+      // Summary
+      addText('Summary', 16, true)
+      addText(data.summary)
+      yPos += 10
+
+      // Key Decisions
+      addText('Key Decisions', 16, true)
+      data.decisions.forEach(decision => {
+        addText(`• ${decision}`)
+      })
+      yPos += 10
+
+      // Action Items
+      addText('Action Items', 16, true)
+      data.actionItems.forEach(item => {
+        addText(`• ${item}`)
+      })
+      yPos += 10
+
+      // Chapters
+      addText('Chapters', 16, true)
+      data.chapters.forEach(chapter => {
+        addText(chapter.title, 14, true)
+        addText(`Timestamp: ${chapter.timestamp}`)
+        addText(chapter.content)
+        yPos += 5
+      })
+      yPos += 10
+
+      // Chat History
+      addText('Chat History', 16, true)
+      data.chatHistory.forEach(chat => {
+        addText(`${chat.type}: ${chat.message}`)
+      })
+      yPos += 10
+
+      // Transcript
+      addText('Transcript', 16, true)
+      data.transcript.forEach((line, index) => {
+        addText(`${String(index + 1).padStart(3, '0')}: ${line}`)
+      })
+
+      // Save the PDF
+      doc.save(`${data.title}-insights.pdf`)
+    } catch (error) {
+      console.error('Error exporting as PDF:', error)
+    }
+  }
+
+  const exportAsWord = () => {
+    try {
+      const data = prepareExportData()
+      
+      const doc = new Document({
+        sections: [{
+          properties: {},
+          children: [
+            new Paragraph({
+              text: data.title,
+              heading: HeadingLevel.TITLE
+            }),
+            new Paragraph({
+              text: `Date: ${data.date}`,
+              spacing: { before: 400 }
+            }),
+            new Paragraph({
+              text: 'Summary',
+              heading: HeadingLevel.HEADING_1,
+              spacing: { before: 400 }
+            }),
+            new Paragraph({ text: data.summary }),
+            new Paragraph({
+              text: 'Key Decisions',
+              heading: HeadingLevel.HEADING_1,
+              spacing: { before: 400 }
+            }),
+            ...data.decisions.map(decision => 
+              new Paragraph({ 
+                text: `• ${decision}`,
+                spacing: { before: 200 }
+              })
+            ),
+            new Paragraph({
+              text: 'Action Items',
+              heading: HeadingLevel.HEADING_1,
+              spacing: { before: 400 }
+            }),
+            ...data.actionItems.map(item => 
+              new Paragraph({ 
+                text: `• ${item}`,
+                spacing: { before: 200 }
+              })
+            ),
+            new Paragraph({
+              text: 'Chapters',
+              heading: HeadingLevel.HEADING_1,
+              spacing: { before: 400 }
+            }),
+            ...data.chapters.flatMap(chapter => [
+              new Paragraph({
+                text: chapter.title,
+                heading: HeadingLevel.HEADING_2,
+                spacing: { before: 300 }
+              }),
+              new Paragraph({ text: `Timestamp: ${chapter.timestamp}` }),
+              new Paragraph({ text: chapter.content, spacing: { before: 200 } })
+            ]),
+            new Paragraph({
+              text: 'Chat History',
+              heading: HeadingLevel.HEADING_1,
+              spacing: { before: 400 }
+            }),
+            ...data.chatHistory.map(chat => 
+              new Paragraph({ 
+                text: `${chat.type}: ${chat.message}`,
+                spacing: { before: 200 }
+              })
+            ),
+            new Paragraph({
+              text: 'Transcript',
+              heading: HeadingLevel.HEADING_1,
+              spacing: { before: 400 }
+            }),
+            ...data.transcript.map((line, index) => 
+              new Paragraph({ 
+                text: `${String(index + 1).padStart(3, '0')}: ${line}`,
+                spacing: { before: 100 }
+              })
+            )
+          ]
+        }]
+      })
+
+      Packer.toBlob(doc).then(blob => {
+        saveAs(blob, `${data.title}-insights.docx`)
+      })
+    } catch (error) {
+      console.error('Error exporting as Word:', error)
+    }
+  }
+
+  const exportAsText = () => {
+    try {
+      const data = prepareExportData()
+      let content = `${data.title}\n`
+      content += `Date: ${data.date}\n\n`
+      content += `Summary:\n${data.summary}\n\n`
+      content += `Key Decisions:\n${data.decisions.map(d => `• ${d}`).join('\n')}\n\n`
+      content += `Action Items:\n${data.actionItems.map(i => `• ${i}`).join('\n')}\n\n`
+      content += `Chapters:\n${data.chapters.map(c => 
+        `## ${c.title}\nTimestamp: ${c.timestamp}\n${c.content}`
+      ).join('\n\n')}\n\n`
+      content += `Chat History:\n${data.chatHistory.map(c => 
+        `${c.type}: ${c.message}`
+      ).join('\n')}\n\n`
+      content += `Transcript:\n${data.transcript.map((line, index) => 
+        `${String(index + 1).padStart(3, '0')}: ${line}`
+      ).join('\n')}`
+
+      const blob = new Blob([content], { type: 'text/plain;charset=utf-8' })
+      saveAs(blob, `${data.title}-insights.txt`)
+    } catch (error) {
+      console.error('Error exporting as text:', error)
+    }
+  }
+
+  const exportAsJson = () => {
+    try {
+      const data = prepareExportData()
+      // Add metadata to the JSON export
+      const jsonData = {
+        version: "1.0",
+        exported_at: new Date().toISOString(),
+        meeting_data: data
+      }
+      
+      const blob = new Blob([JSON.stringify(jsonData, null, 2)], { 
+        type: 'application/json;charset=utf-8' 
+      })
+      saveAs(blob, `${data.title}-insights.json`)
+    } catch (error) {
+      console.error('Error exporting as JSON:', error)
+    }
+  }
+
+  const SaveAsButton = () => (
+    <div className="mt-8 flex justify-center">
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="outline" className="flex items-center gap-2">
+            Export Insights
+            <span className="text-xs">▼</span>
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent>
+          <DropdownMenuItem onClick={exportAsPDF}>
+            <div className="flex items-center gap-2">
+              PDF
+              <span className="bg-blue-500 text-white px-2 py-1 rounded text-xs">PDF</span>
+            </div>
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={exportAsWord}>
+            <div className="flex items-center gap-2">
+              Word Document
+              <span className="bg-blue-500 text-white px-2 py-1 rounded text-xs">DOCX</span>
+            </div>
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={exportAsText}>
+            <div className="flex items-center gap-2">
+              Text File
+              <span className="bg-blue-500 text-white px-2 py-1 rounded text-xs">TXT</span>
+            </div>
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={exportAsJson}>
+            <div className="flex items-center gap-2">
+              JSON Data
+              <span className="bg-green-500 text-white px-2 py-1 rounded text-xs">JSON</span>
+            </div>
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
+  )
 
   if (loading) {
     return <div className="flex items-center justify-center min-h-screen">Loading...</div>
@@ -564,23 +866,7 @@ export default function MeetingInsightPage() {
         </Card>
       </div>
 
-      {/* Save As Button at Complete Bottom */}
-      <div className="mt-8 flex justify-center">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" className="flex items-center gap-2">
-              Save As
-              <span className="text-xs">▼</span>
-              <span className="bg-blue-500 text-white px-2 py-1 rounded text-xs">PDF</span>
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent>
-            <DropdownMenuItem>PDF</DropdownMenuItem>
-            <DropdownMenuItem>Word Document</DropdownMenuItem>
-            <DropdownMenuItem>Text File</DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
+      <SaveAsButton />
     </div>
   )
 } 
