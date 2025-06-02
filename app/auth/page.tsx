@@ -4,69 +4,18 @@ import { useState } from "react";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
-import { Separator } from "@/components/ui/separator";
 import { syncUser } from "@/lib/api";
 
 export default function AuthPage() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [isSignUp, setIsSignUp] = useState(false);
   const router = useRouter();
   const supabase = createClientComponentClient();
 
-  const handleAuth = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-
-    try {
-      const { data, error } = isSignUp
-        ? await supabase.auth.signUp({
-            email,
-            password,
-            options: {
-              emailRedirectTo: `${location.origin}/auth/callback`,
-            },
-          })
-        : await supabase.auth.signInWithPassword({
-            email,
-            password,
-          });
-
-      if (error) {
-        toast.error(error.message);
-        return;
-      }
-
-      // Sync user data with our backend
-      if (data.user) {
-        try {
-          await syncUser(data.user);
-        } catch (error) {
-          console.error('Error syncing user:', error);
-          // Don't block the auth flow if sync fails
-        }
-      }
-
-      if (isSignUp) {
-        toast.success("Check your email for the confirmation link!");
-      } else {
-        toast.success("Successfully logged in!");
-        router.push("/");
-        router.refresh();
-      }
-    } catch (error) {
-      toast.error("An error occurred during authentication");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const handleGoogleSignIn = async () => {
     try {
+      setIsLoading(true);
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
@@ -79,6 +28,8 @@ export default function AuthPage() {
       }
     } catch (error) {
       toast.error("An error occurred during Google sign in");
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -86,19 +37,18 @@ export default function AuthPage() {
     <div className="flex min-h-screen items-center justify-center p-4">
       <Card className="w-full max-w-md">
         <CardHeader>
-          <CardTitle>{isSignUp ? "Create an Account" : "Welcome Back"}</CardTitle>
+          <CardTitle>Welcome to MeetingIQ Pro</CardTitle>
           <CardDescription>
-            {isSignUp
-              ? "Enter your details to create a new account"
-              : "Enter your credentials to login"}
+            Sign in with your Google account to continue
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent>
           <Button 
             type="button" 
             variant="outline" 
             className="w-full flex items-center justify-center gap-2"
             onClick={handleGoogleSignIn}
+            disabled={isLoading}
           >
             <svg viewBox="0 0 24 24" className="h-5 w-5">
               <path
@@ -118,55 +68,8 @@ export default function AuthPage() {
                 fill="#EA4335"
               />
             </svg>
-            Continue with Google
+            {isLoading ? "Signing in..." : "Continue with Google"}
           </Button>
-
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <Separator />
-            </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-background px-2 text-muted-foreground">
-                Or continue with email
-              </span>
-            </div>
-          </div>
-
-          <form onSubmit={handleAuth} className="space-y-4">
-            <div className="space-y-2">
-              <Input
-                type="email"
-                placeholder="Email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-              />
-              <Input
-                type="password"
-                placeholder="Password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
-            </div>
-            <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading
-                ? "Loading..."
-                : isSignUp
-                ? "Create Account"
-                : "Sign In"}
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              className="w-full"
-              onClick={() => setIsSignUp(!isSignUp)}
-            >
-              {isSignUp
-                ? "Already have an account? Sign In"
-                : "Need an account? Sign Up"}
-            </Button>
-          </form>
         </CardContent>
       </Card>
     </div>
