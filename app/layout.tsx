@@ -4,7 +4,7 @@ import { UserProvider } from '@/contexts/UserContext'
 import { Toaster } from '@/components/ui/toaster'
 
 export const metadata: Metadata = {
-  title: 'MeetingIQ Pro',
+  title: 'minutes.ai',
   description: 'AI-powered meeting analysis and insights platform',
 }
 

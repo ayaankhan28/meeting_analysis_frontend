@@ -60,7 +60,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
               <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
                 <Brain className="w-5 h-5 text-white" />
               </div>
-              <span className="text-xl font-semibold text-gray-900 dark:text-white">MeetingIQ Pro</span>
+              <span className="text-xl font-semibold text-gray-900 dark:text-white">minutes.ai</span>
             </Link>
 
             {/* Navigation */}
@@ -106,15 +106,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                     Settings
                   </Link>
                 </DropdownMenuItem>
-                <DropdownMenuItem>
-                  <Zap className="mr-2 h-4 w-4" />
-                  Integrations
-                </DropdownMenuItem>
-                <DropdownMenuItem>
-                  <HelpCircle className="mr-2 h-4 w-4" />
-                  Support
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
+                
                 <DropdownMenuItem onClick={() => signOut()}>
                   <LogOut className="mr-2 h-4 w-4" />
                   Log out

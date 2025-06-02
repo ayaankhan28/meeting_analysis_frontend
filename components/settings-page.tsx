@@ -22,16 +22,67 @@ export function SettingsPage() {
   const [phoneNumber, setPhoneNumber] = useState("")
   const [isConnected, setIsConnected] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  const [whatsappState, setWhatsappState] = useState<string>("unknown")
   const { toast } = useToast()
   const { user } = useUser()
 
-  // Initialize connection status based on user data
+  // Initialize connection status and phone number from user data
   useEffect(() => {
-    if (user?.notification_active && user?.phone_number) {
-      setPhoneNumber(user.phone_number)
-      setIsConnected(true)
+    if (user) {
+      // Only set these values if they're not already set correctly
+      if (phoneNumber !== user.phone_number && user.phone_number) {
+        setPhoneNumber(user.phone_number)
+      }
     }
   }, [user])
+
+  // Fetch WhatsApp state
+  useEffect(() => {
+    let isMounted = true;
+    const fetchWhatsAppState = async () => {
+      if (user?.id) {
+        try {
+          const response = await fetch(`http://localhost:8000/get-state?user_id=${user.id}`)
+          if (response.ok && isMounted) {
+            const data = await response.json()
+            // Check both status and notification_active flag
+            if (data.status === "success") {
+              if (data.notification_active) {
+                setWhatsappState("connected")
+                setIsConnected(true)
+              } else {
+                setWhatsappState("disconnected")
+                setIsConnected(false)
+              }
+              // Update phone number if available
+              if (data.phone_number && phoneNumber !== data.phone_number) {
+                setPhoneNumber(data.phone_number)
+              }
+            } else {
+              setWhatsappState("disconnected")
+              setIsConnected(false)
+            }
+          }
+        } catch (error) {
+          console.error("Failed to fetch WhatsApp state:", error)
+          if (isMounted) {
+            // Don't update state on error if we're already connected
+            if (!isConnected) {
+              setWhatsappState("error")
+            }
+          }
+        }
+      }
+    }
+
+    fetchWhatsAppState()
+    const interval = setInterval(fetchWhatsAppState, 30000)
+    
+    return () => {
+      isMounted = false;
+      clearInterval(interval)
+    }
+  }, [user?.id, phoneNumber])
 
   const handleConnect = async () => {
     if (!isConnected) {
@@ -83,6 +134,7 @@ export function SettingsPage() {
         console.log('Success response:', data)
 
         setIsConnected(true)
+        setWhatsappState("connected")
         toast({
           title: "WhatsApp Connected",
           description: "You will now receive meeting analysis notifications via WhatsApp",
@@ -95,6 +147,8 @@ export function SettingsPage() {
           description: "Failed to connect WhatsApp. Please try again.",
           variant: "destructive"
         })
+        setIsConnected(false)
+        setWhatsappState("disconnected")
       } finally {
         setIsLoading(false)
       }
@@ -123,6 +177,7 @@ export function SettingsPage() {
         }
 
         setIsConnected(false)
+        setWhatsappState("disconnected")
         setPhoneNumber("")
         toast({
           title: "WhatsApp Disconnected",
@@ -136,6 +191,9 @@ export function SettingsPage() {
           description: "Failed to disconnect WhatsApp. Please try again.",
           variant: "destructive"
         })
+        // Keep the connected state on disconnect failure
+        setIsConnected(true)
+        setWhatsappState("connected")
       } finally {
         setIsLoading(false)
       }
@@ -168,6 +226,11 @@ export function SettingsPage() {
                 <p className="text-sm text-gray-600 dark:text-gray-400">
                   Receive meeting summaries and notifications via WhatsApp
                 </p>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  Status: <span className={`font-medium ${isConnected ? "text-green-600" : "text-yellow-600"}`}>
+                    {isConnected ? "Connected" : "Disconnected"}
+                  </span>
+                </p>
               </div>
             </div>
             <Button 
@@ -182,7 +245,7 @@ export function SettingsPage() {
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                   </svg>
-                  Connecting...
+                  {isConnected ? "Disconnecting..." : "Connecting..."}
                 </span>
               ) : isConnected ? "Disconnect" : "Connect"}
             </Button>

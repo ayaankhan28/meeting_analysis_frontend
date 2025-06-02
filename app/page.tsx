@@ -147,6 +147,7 @@ export default function LandingPage() {
             <Button 
               size="lg" 
               className="bg-teal-600 hover:bg-teal-700 text-white font-medium px-10 py-4 rounded-xl text-lg shadow-lg hover:shadow-xl transition-all duration-200 border-0"
+              onClick={() => router.push('/meetings')}
             >
               Get Started
             </Button>
@@ -155,11 +156,11 @@ export default function LandingPage() {
           {/* Main Heading and Description - Below button */}
           <div className="relative z-10 text-center">
             <h1 className="text-5xl sm:text-6xl font-light text-gray-900 mb-6 tracking-tight leading-tight">
-              Transcribe your meetings<br />
-              <span className="font-normal">with ease</span>
+              Transform your meetings<br />
+              <span className="font-normal">with minutes.ai</span>
             </h1>
             <p className="text-xl text-gray-500 max-w-2xl mx-auto font-light leading-relaxed">
-              Get accurate transcripts of your meetings in minutes.<br />
+              Get accurate meeting analysis in few minutes<br />
               Focus on the conversation, not note-taking.
             </p>
           </div>
@@ -169,7 +170,7 @@ export default function LandingPage() {
       {/* Recent Transcripts Section */}
       <div className="space-y-6">
         <div className="flex items-center justify-between">
-          <h2 className="text-2xl font-light text-gray-900 dark:text-white">Recent Transcripts</h2>
+          <h2 className="text-2xl font-light text-gray-900 dark:text-white">Recent Meetings</h2>
           <Button 
             variant="outline" 
             className="border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 font-light"
@@ -225,7 +226,7 @@ export default function LandingPage() {
                       className="border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 font-light"
                       onClick={() => handleViewTranscript(meeting.media_id)}
                     >
-                      View Transcript
+                      View Insights
                     </Button>
                   </div>
                 </CardContent>
