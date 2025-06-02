@@ -92,11 +92,10 @@ export default function MeetingInsightPage() {
   const [insight, setInsight] = useState<MeetingInsight | null>(null)
   const [selectedChapter, setSelectedChapter] = useState<number>(0)
   const [chatMessages, setChatMessages] = useState([
-    { id: 1, type: 'bot', message: 'Hello! I can help you understand this meeting content. Ask me anything about the discussion!' },
-    { id: 2, type: 'user', message: 'What were the main decisions made in this meeting?' },
-    { id: 3, type: 'bot', message: 'The main decisions included: setting the launch date for Q2 2024, approving the initial pricing strategy, identifying target market segments, allocating the marketing budget, and finalizing the core feature set.' }
+    { id: 1, type: 'bot', message: 'Hello! I can help you understand this meeting content. Ask me anything about the discussion!' }
   ])
   const [currentMessage, setCurrentMessage] = useState('')
+  const [isSending, setIsSending] = useState(false)
 
   useEffect(() => {
     const fetchInsights = async () => {
@@ -169,25 +168,54 @@ export default function MeetingInsightPage() {
     return `${hours}h ${minutes}m`
   }
 
-  const handleSendMessage = () => {
-    if (currentMessage.trim()) {
-      const newMessage = {
-        id: chatMessages.length + 1,
-        type: 'user' as const,
-        message: currentMessage
-      }
-      setChatMessages([...chatMessages, newMessage])
-      setCurrentMessage('')
-      
-      // Simulate bot response
-      setTimeout(() => {
-        const botResponse = {
+  const handleSendMessage = async () => {
+    if (currentMessage.trim() && !isSending) {
+      try {
+        setIsSending(true)
+        const newMessage = {
+          id: chatMessages.length + 1,
+          type: 'user' as const,
+          message: currentMessage
+        }
+        setChatMessages(prev => [...prev, newMessage])
+        setCurrentMessage('')
+
+        // Call the chat API
+        const response = await axios.post(`${API_BASE_URL}/chat`, {
+          user_id: user?.id,
+          media_id: params.id,
+          message: currentMessage
+        })
+
+        if (response.data.status === 'success') {
+          const botResponse = {
+            id: chatMessages.length + 2,
+            type: 'bot' as const,
+            message: response.data.response
+          }
+          setChatMessages(prev => [...prev, botResponse])
+        } else {
+          throw new Error('Failed to get response from AI')
+        }
+      } catch (error) {
+        console.error('Chat error:', error)
+        const errorMessage = {
           id: chatMessages.length + 2,
           type: 'bot' as const,
-          message: 'I understand your question about the meeting. Based on the content, I can provide insights about the topics discussed, decisions made, and action items assigned.'
+          message: 'Sorry, I encountered an error while processing your message. Please try again.'
         }
-        setChatMessages(prev => [...prev, botResponse])
-      }, 1000)
+        setChatMessages(prev => [...prev, errorMessage])
+      } finally {
+        setIsSending(false)
+      }
+    }
+  }
+
+  // Add keypress handler for Enter key
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      handleSendMessage()
     }
   }
 
@@ -327,15 +355,19 @@ export default function MeetingInsightPage() {
                     placeholder="Ask about the meeting..."
                     value={currentMessage}
                     onChange={(e) => setCurrentMessage(e.target.value)}
-                    onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
+                    onKeyPress={handleKeyPress}
                     className="flex-1"
                   />
                   <Button 
                     size="icon" 
                     onClick={handleSendMessage}
-                    disabled={!currentMessage.trim()}
+                    disabled={!currentMessage.trim() || isSending}
                   >
-                    <Send className="w-4 h-4" />
+                    {isSending ? (
+                      <div className="animate-spin">⌛</div>
+                    ) : (
+                      <Send className="w-4 h-4" />
+                    )}
                   </Button>
                 </div>
               </CardContent>
