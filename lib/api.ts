@@ -1,6 +1,6 @@
 import { User } from "@/hooks/useAuth";
 
-// const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 export async function syncUser(user: User) {
   try {
@@ -12,12 +12,11 @@ export async function syncUser(user: User) {
       avatar_url: user.user_metadata?.avatar_url || null
     };
 
-    const response = await fetch(`http://localhost:8000/sync_user`, {
+    const response = await fetch(`${API_BASE_URL}/sync_user`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      credentials: 'include', // Include cookies for cross-origin requests
       body: JSON.stringify(userData),
     });
 

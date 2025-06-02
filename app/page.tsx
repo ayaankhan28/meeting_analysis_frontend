@@ -9,6 +9,7 @@ import { DashboardLayout } from "@/components/dashboard-layout"
 import { DefaultIllustration } from "@/components/default-illustration"
 import axios from "axios"
 import { useRouter } from "next/navigation"
+import { API_BASE_URL } from "@/lib/config"
 
 interface RecentMeeting {
   media_id: string
@@ -28,7 +29,7 @@ export default function LandingPage() {
     const fetchRecentMeetings = async () => {
       try {
         if (user?.id) {
-          const response = await axios.get(`http://localhost:8000/get-user-media`, {
+          const response = await axios.get(`${API_BASE_URL}/get-user-media`, {
             params: {
               user_id: user.id,
               recent: true

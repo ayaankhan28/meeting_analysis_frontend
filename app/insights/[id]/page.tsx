@@ -22,6 +22,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Input } from "@/components/ui/input"
 import { DefaultIllustration } from "@/components/default-illustration"
 import { ImageWithFallback } from "@/components/image-with-fallback"
+import { API_BASE_URL } from "@/lib/config"
 
 interface Chapter {
   chapter_title: string;
@@ -101,7 +102,7 @@ export default function MeetingInsightPage() {
     const fetchInsights = async () => {
       try {
         setLoading(true);
-        const response = await axios.get<ApiResponse>(`http://localhost:8000/media/${params.id}/analysis`);
+        const response = await axios.get<ApiResponse>(`${API_BASE_URL}/media/${params.id}/analysis`);
         
         if (response.data.status === 'success' && response.data.data.status === 'done') {
           const analysisData = response.data.data;

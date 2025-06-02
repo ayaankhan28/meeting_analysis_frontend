@@ -10,6 +10,7 @@ import axios from "axios"
 import { useAuth } from "@/hooks/useAuth"
 import { DefaultIllustration } from "@/components/default-illustration"
 import { useRouter } from "next/navigation"
+import { API_BASE_URL } from "@/lib/config"
 
 export function UploadMeeting() {
   const router = useRouter()
@@ -83,7 +84,7 @@ export function UploadMeeting() {
       const mediaDuration = await getMediaDuration(selectedFile)
 
       // Get presigned URL from backend
-      uploadResponse = await axios.get(`http://localhost:8000/generate-presigned-url`, {
+      uploadResponse = await axios.get(`${API_BASE_URL}/generate-presigned-url`, {
         params: {
           file_name: selectedFile.name,
           file_type: fileType,
@@ -107,7 +108,7 @@ export function UploadMeeting() {
       })
 
       // Update media status after successful upload
-      await axios.post('http://localhost:8000/update-media-status', {
+      await axios.post(`${API_BASE_URL}/update-media-status`, {
         media_id: media_id,
         upload_status: 'completed',
         language: selectedLanguage,
@@ -115,7 +116,7 @@ export function UploadMeeting() {
       })
 
       // Start processing the file immediately after successful upload
-      await axios.post(`http://localhost:8000/media/${media_id}/analyze`)
+      await axios.post(`${API_BASE_URL}/media/${media_id}/analyze`)
 
       // Reset state after successful upload
       setIsUploading(false)
@@ -137,7 +138,7 @@ export function UploadMeeting() {
       // Update media status to failed if upload fails
       if (mediaId) {
         try {
-          await axios.post('http://localhost:8000/update-media-status', {
+          await axios.post(`${API_BASE_URL}/update-media-status`, {
             media_id: mediaId,
             upload_status: 'failed'
           })

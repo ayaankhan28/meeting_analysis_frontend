@@ -9,6 +9,7 @@ import axios from "axios"
 import { useAuth } from "@/hooks/useAuth"
 import { useRouter } from "next/navigation"
 import { ImageWithFallback } from "@/components/image-with-fallback"
+import { API_BASE_URL } from "@/lib/config"
 
 type MediaType = "video" | "audio"
 type UploadStatus = "pending" | "processing" | "completed" | "failed"
@@ -83,7 +84,7 @@ export function ArchiveSearch() {
     try {
       setLoading(true)
       setError(null)
-      const response = await axios.get(`${process.env.NEXT_PUBLIC_BACKEND_URL}/get-user-media?user_id=${user.id}`)
+      const response = await axios.get(`${API_BASE_URL}/get-user-media?user_id=${user.id}`)
       console.log('User media response:', response.data)
       setUserMedia(response.data)
       setFilteredMedia(response.data)

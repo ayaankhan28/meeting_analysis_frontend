@@ -6,6 +6,8 @@ import { useState, useEffect } from "react"
 import { Input } from "@/components/ui/input"
 import { useToast } from "@/components/ui/use-toast"
 import { useUser } from "@/contexts/UserContext"
+import { API_BASE_URL } from "@/lib/config"
+import axios from "axios"
 
 const WhatsAppIcon = () => (
   <svg
@@ -42,7 +44,7 @@ export function SettingsPage() {
     const fetchWhatsAppState = async () => {
       if (user?.id) {
         try {
-          const response = await fetch(`http://localhost:8000/get-state?user_id=${user.id}`)
+          const response = await fetch(`${API_BASE_URL}/get-state?user_id=${user.id}`)
           if (response.ok && isMounted) {
             const data = await response.json()
             // Check both status and notification_active flag
@@ -110,7 +112,7 @@ export function SettingsPage() {
       setIsLoading(true)
       try {
         console.log('Making API call to connect endpoint')
-        const response = await fetch('http://localhost:8000/connect', {
+        const response = await fetch(`${API_BASE_URL}/connect`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -157,7 +159,7 @@ export function SettingsPage() {
       setIsLoading(true)
       try {
         console.log('Making API call to disconnect endpoint')
-        const response = await fetch('http://localhost:8000/disconnect', {
+        const response = await fetch(`${API_BASE_URL}/disconnect`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
